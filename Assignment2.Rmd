@@ -1,0 +1,410 @@
+---
+title: "Computational Modeling - Week 4 - Assignment 2 - Part 1"
+author: "Riccardo Fusaroli"
+date: "2/19/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## In this assignment we learn how to assess rates from a binomial distribution, using the case of assessing your teachers' knowledge of CogSci
+
+### First part
+
+You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queens, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
+
+To keep things simple (your teachers should not be faced with too complicated things):
+- You created a pool of equally challenging questions on CogSci
+- Each question can be answered correctly or not (we don't allow partially correct answers, to make our life simpler).
+- Knowledge of CogSci can be measured on a scale from 0 (negative knowledge, all answers wrong) through 0.5 (random chance) to 1 (awesome CogSci superpowers)
+
+This is the data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Josh: 160 correct answers out of 198 questions (Josh never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+Questions:
+
+1. What's Riccardo's estimated knowledge of CogSci? What is the probability he knows more than chance (0.5) [try figuring this out. if you can't peek into chapters 3.1 and 3.2 and/or the slides]?
+- First implement a grid approximation (hint check paragraph 2.4.1!) with a uniform prior, calculate the posterior and plot the results
+
+```{r}
+
+
+grid_approx = function(correct,trial, prior = rep(1,1000)){
+p_grid = seq(0,1,length.out = 1000) 
+
+prior = prior #assigning priors. don't this have to sum to 1?
+
+#first argument is target count,w, and size the total observations,n.
+likelihood = dbinom(correct, size = trial, prob = p_grid)
+
+unstandardized.posterior = likelihood * prior
+
+posterior = unstandardized.posterior / sum(unstandardized.posterior)
+
+return(posterior)
+}
+
+riccardo_posterior = grid_approx(3,6)
+
+plot_posterior = function(posterior, vline = 0.5, prior = rep(1,1000)){
+  
+  grid  = seq(0,1,length.out = 1000) 
+  map = grid[which.max(posterior)]
+  
+  ggplot() +
+  geom_col(aes(x = grid, y = posterior, fill = posterior)) +
+  geom_vline(xintercept= map , color = "black") +
+  geom_line(aes(x = grid, y = (prior/sum(prior))), color = "red") +  
+  labs(x = "probability of correct response", y = "Posterior distribution")
+}
+
+plot_posterior(riccardo_posterior)
+```
+
+
+```{r}
+sum((p_grid > 0.5)*riccardo_posterior)
+
+
+```
+The area under the curve where p > 0.5 equals 0.5
+
+
+- Then implement a quadratic approximation (hint check paragraph 2.4.2!).
+
+
+
+
+```{r}
+library(rethinking)
+globe.qa <- map(
+alist(
+w ~ dbinom(6,p) , # binomial likelihood
+p ~ dunif(0,1) # uniform prior
+) ,
+data=list(w=3) )
+# display summary of quadratic approximation
+precis( globe.qa )
+```
+Mean is in accordance with the plot from grid approximation.
+
+
+- N.B. for the rest of the exercise just keep using the grid approximation (we'll move to quadratic approximations in two classes)
+
+
+```{r}
+
+```
+
+
+
+2. Estimate all the teachers' knowledge of CogSci. Who's best? Use grid approximation. Comment on the posteriors of Riccardo and Mikkel.
+
+```{r}
+Kristian_posterior = grid_approx(2,2)
+Josh_posterior = grid_approx(160,198)
+Mikkel_posterior = grid_approx(66,132)
+```
+
+Maximum a posteriori (MAP) of Riccardo
+```{r}
+p_grid[which.max(riccardo_posterior)]
+```
+
+MAP Kristian
+```{r}
+
+p_grid[which.max(Kristian_posterior)]
+```
+
+MAP Josh
+```{r}
+
+p_grid[which.max(Josh_posterior)]
+```
+
+```{r}
+p_grid[which.max(Mikkel_posterior)]
+```
+
+Josh has the largest maximum a posteriori value. 
+
+
+2a. Produce plots of the prior, and posterior for each teacher.
+
+Red horizontal line visualize prior.
+Black vetical line visualize MAP
+
+```{r}
+
+plot_posterior(Kristian_posterior)
+
+```
+
+
+
+```{r}
+
+plot_posterior(Josh_posterior)
+```
+
+```{r}
+
+plot_posterior(Mikkel_posterior)
+```
+
+
+
+
+3. Change the prior. Given your teachers have all CogSci jobs, you should start with a higher appreciation of their knowledge: the prior is a normal distribution with a mean of 0.8 and a standard deviation of 0.2. Do the results change (and if so how)?
+```{r}
+riccardo_posterior_norm_prior = grid_approx(correct = 3, trial = 6, prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+Kristian_posterior_norm_prior = grid_approx(2,2, prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+Josh_posterior_norm_prior = grid_approx(160,198, prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+Mikkel_posterior_norm_prior = grid_approx(66,132, prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+
+```
+
+
+
+3a. Produce plots of the prior and posterior for each teacher.
+```{r}
+plot_posterior(riccardo_posterior_norm_prior,prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+```
+```{r}
+p_grid[which.max(riccardo_posterior)]
+p_grid[which.max(riccardo_posterior_norm_prior)]
+```
+
+
+
+```{r}
+plot_posterior(Kristian_posterior_norm_prior,prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+```
+
+```{r}
+p_grid[which.max(Kristian_posterior)]
+p_grid[which.max(Kristian_posterior_norm_prior)]
+```
+
+
+```{r}
+plot_posterior(Josh_posterior_norm_prior,prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+```
+```{r}
+p_grid[which.max(Josh_posterior)]
+p_grid[which.max(Josh_posterior_norm_prior)]
+```
+
+
+
+```{r}
+plot_posterior(Mikkel_posterior_norm_prior,,prior =dnorm(seq(0,1,length.out = 1000),mean=0.8,sd=0.2))
+```
+```{r}
+p_grid[which.max(Mikkel_posterior)]
+p_grid[which.max(Mikkel_posterior_norm_prior)]
+```
+
+4. You go back to your teachers and collect more data (multiply the previous numbers by 100). Calculate their knowledge with both a uniform prior and a normal prior with a mean of 0.8 and a standard deviation of 0.2. Do you still see a difference between the results? Why?
+
+```{r}
+riccardo_more_data = grid_approx(correct = 300, trial = 600, prior =dnorm(seq(0,1,length.out = 1000),mean=1,sd=1))
+Kristian_more_data = grid_approx(200,200, prior =dnorm(seq(0,1,length.out = 1000),mean=1,sd=1))
+Josh_more_data = grid_approx(16000,19800, prior =dnorm(seq(0,1,length.out = 1000),mean=1,sd=1))
+Mikkel_more_data = grid_approx(6600,13200, prior =dnorm(seq(0,1,length.out = 1000),mean=1,sd=1))
+```
+
+```{r}
+plot_posterior(riccardo_more_data)
+```
+
+```{r}
+plot_posterior(Josh_more_data)
+```
+
+
+
+```{r}
+plot_posterior(Mikkel_more_data)
+```
+
+```{r}
+plot_posterior(Kristian_more_data)
+```
+
+
+5. Imagine you're a skeptic and think your teachers do not know anything about CogSci, given the content of their classes. How would you operationalize that belief?
+
+I will model this belief with having a prior favoring random answers having a high density centered around p = 0.5. This can be modeled by having a gaussian prior with a mean of 0.5 and and a standard deviation of 0.1
+```{r}
+riccardo_know_nothing = grid_approx(3,6, prior =dnorm(seq(0,1,length.out = 1000),mean=0.5,sd=0.1))
+Kristian_know_nothing = grid_approx(2,2, prior =dnorm(seq(0,1,length.out = 1000),mean=0.5,sd=0.1))
+Josh_know_nothing = grid_approx(160,198, prior =dnorm(seq(0,1,length.out = 1000),mean=0.5,sd=0.1))
+Mikkel_know_nothing = grid_approx(66,132, prior =dnorm(seq(0,1,length.out = 1000),mean=0.5,sd=0.1))
+
+plot_posterior(Josh_know_nothing,prior =dnorm(seq(0,1,length.out = 1000),mean=0.5,sd=0.2))
+```
+
+Comparing flat prior, normal prior, extra data and the conservative prior for:
+
+```{r}
+data.frame(flat_prior =riccardo_posterior, normal_prior = riccardo_posterior_norm_prior, more_data = riccardo_more_data, conservative_prior = riccardo_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+```
+
+
+
+```{r}
+data.frame(flat_prior =Kristian_posterior, normal_prior = Kristian_posterior_norm_prior, more_data = Kristian_more_data, conservative_prior = Kristian_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+
+```
+
+```{r}
+data.frame(flat_prior =Josh_posterior, normal_prior = Josh_posterior_norm_prior, more_data = Josh_more_data, conservative_prior = Josh_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+
+```
+
+```{r}
+data.frame(flat_prior =Mikkel_posterior, normal_prior = Mikkel_posterior_norm_prior, more_data = Mikkel_more_data, conservative_prior = Mikkel_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+```
+
+
+
+```{r}
+data.frame(flat_prior =Mikkel_posterior, normal_prior = Mikkel_posterior_norm_prior, more_data = Mikkel_more_data, conservative_prior = Mikkel_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+```
+
+
+
+```{r}
+data.frame(flat_prior =Josh_posterior, normal_prior = Josh_posterior_norm_prior, more_data = Josh_more_data, conservative_prior = Josh_know_nothing, p = p_grid) %>%  
+  gather(name,value, flat_prior:conservative_prior) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line()
+```
+
+
+
+```{r}
+data.frame(R = riccardo_know_nothing, J=Josh_know_nothing, K=Kristian_know_nothing, M=Mikkel_know_nothing, p = p_grid, prior = dnorm(p_grid,0.5,0.1)) %>%
+  gather(name,value, R:M) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line() +
+  geom_line(aes(x = p, y = prior / sum(1000)), color = "black")+
+  xlab("Proportion of correct answers") +
+  ylab("Probability")
+  
+
+
+```
+
+```{r}
+data.frame(R = riccardo_posterior, J=Josh_posterior, K=Kristian_posterior, M=Mikkel_posterior, p = p_grid, prior = 1) %>%
+  gather(name,value, R:M) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line() +
+  geom_line(aes(x = p, y = prior / sum(1000)), color = "black")+
+  xlab("Proportion of correct answers") +
+  ylab("Probability")
+  
+```
+
+
+```{r}
+data.frame(R = riccardo_more_data, J=Josh_more_data, K=Kristian_more_data, M=Mikkel_more_data, p = p_grid, prior = 1) %>%
+  gather(name,value, R:M) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line() +
+  geom_line(aes(x = p, y = prior / sum(1000)), color = "black")+
+  xlab("Proportion of correct answers") +
+  ylab("Probability")
+  
+
+```
+
+
+```{r}
+data.frame(R = riccardo_more_data, J=Josh_more_data, K=Kristian_more_data, M=Mikkel_more_data, p = p_grid, prior = dnorm(p_grid, 0.8,0.2)) %>%
+  gather(name,value, R:M) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line() +
+  geom_line(aes(x = p, y = prior / sum(1000)), color = "black")+
+  xlab("Proportion of correct answers") +
+  ylab("Probability")
+  
+```
+
+
+```{r}
+data.frame(R = riccardo_c, J=Josh_more_data, K=Kristian_more_data, M=Mikkel_more_data, p = p_grid, prior = dnorm(p_grid, 0.8,0.2)) %>%
+  gather(name,value, R:M) %>% 
+  ggplot(aes(x=p, y = value, color = name))+
+  geom_line() +
+  geom_line(aes(x = p, y = prior / sum(1000)), color = "black")+
+  xlab("Proportion of correct answers") +
+  ylab("Probability")
+  
+```
+
+
+
+6. Optional question: Can you estimate the difference between Riccardo's estimated knowledge and that of each of the other teachers? Would you deem it credible (that is, would you believe that it is actually different)?
+
+
+```{r}
+riccardo_sum = sum((p_grid > 0.5)*riccardo_posterior_norm_prior)
+
+kristian_sum = sum((p_grid > 0.5)*Kristian_posterior_norm_prior)
+
+josh_sum = sum((p_grid > 0.5)*Josh_posterior_norm_prior)
+
+mikkel_sum = sum((p_grid > 0.5)*Mikkel_posterior_norm_prior)
+riccardo_sum
+kristian_sum
+josh_sum
+mikkel_sum
+```
+
+7. Bonus knowledge: all the stuff we have done can be implemented in a lme4-like fashion using the brms package. Here is an example.
+```{r}
+library(brms)
+d <- data.frame(
+  Correct=c(3,2,160,66),
+  Questions=c(6,2,198,132),
+  Teacher=c("RF","KT","JS","MW"))
+
+FlatModel <- brm(Correct|trials(Questions)~1,data=subset(d,Teacher=="RF"),prior=prior("uniform(0,1)", class = "Intercept"))
+plot(FlatModel)
+PositiveModel <- brm(Correct|trials(Questions)~1,data=subset(d,Teacher=="RF"),prior=prior("normal(0.8,0.2)", class = "Intercept"))
+plot(PositiveModel)
+SkepticalModel <- brm(Correct|trials(Questions)~1,data=subset(d,Teacher=="RF"),prior=prior("normal(0.5,0.01)", class = "Intercept"))
+plot(SkepticalModel)
+```
+
+If you dare, try to tweak the data and model to test two hypotheses:
+- Is Kristian different from Josh?
+- Is Josh different from chance?
+
+
+
