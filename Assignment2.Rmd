@@ -14,7 +14,7 @@ library(tidyverse)
 
 ### First part
 
-You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queens, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
+You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queen s, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
 
 To keep things simple (your teachers should not be faced with too complicated things):
 - You created a pool of equally challenging questions on CogSci
@@ -69,6 +69,8 @@ plot_posterior(riccardo_posterior)
 
 
 ```{r}
+p_grid = seq(0,1,length.out = 1000)
+
 sum((p_grid > 0.5)*riccardo_posterior)
 
 

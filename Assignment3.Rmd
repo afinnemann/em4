@@ -1,0 +1,461 @@
+---
+title: "Assignment3"
+author: "RF"
+date: "3/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/Adam/Downloads")
+da = read.csv("Assignment3Data.csv")
+library(tidyverse)
+library(rethinking)
+```
+
+
+Functions for observered vs. predicted plot, and sampled models
+```{r}
+
+obs_pred_plot = function(observed_col,map_object, xlab = "Observed", ylab ="Predicted"){
+
+mu.mean = link(map_object) %>% 
+  apply(2,mean)
+mu.PI = link(map_object) %>% 
+  apply(2,PI)
+
+plot( mu.mean ~ observed_col , col=rangi2 , ylim=range(mu.PI) ,
+      xlab=xlab , ylab=ylab )
+abline( a=0 , b=1 , lty=2 )
+for ( i in 1:nrow(d) )
+  lines( rep(observed_col[i],2) , c(mu.PI[1,i],mu.PI[2,i]) ,
+         col=rangi2 )
+}
+
+
+
+
+sampled_lines_plot = function(outcome_col,predictor_col,map_object, xlab ="X", ylab = "Y", N_lines = 20){
+post = extract.samples(map_object)
+
+plot( predictor_col , outcome_col,
+      xlim=range(predictor_col) , ylim=range(outcome_col) ,
+      col=rangi2 , xlab=xlab , ylab=ylab )
+mtext(concat("N_sampled_lines = ",N_lines))
+
+# plot the lines, with transparency
+for ( i in 1:N_lines )
+  abline( a=post$a[i] , b=post$b[i] , col=col.alpha("black",0.3) )
+}
+
+
+
+```
+
+## Multivariate linear models
+
+In this assignment you will investigate the relation between different aspects of IQ and symptom severity in ASD (as measured by ADOS). The assignment is meant to make you practice on linear models, multiple predictors and interactions.
+
+The data you will use is the outcome of the psychological testing of the children you analyzed in methods 3.
+Data: https://www.dropbox.com/s/hom2qnmp9hyfwmu/Assignment3Data.csv?dl=0
+The data consists of ChildID, gender, age, diagnosis (ASD), symptom severity (ADOS), several aspects of IQ (NonVerbal/Perceptual,Verbal,Social) and the visit at which the tests were administered. The questions should be answered by focusing on visit 1.
+
+```{r}
+d = filter(da, Visit == 1 & ASD == 1 & ADOS > 0)
+```
+
+
+The questions you will have to answer are:
+
+1. Assess the relation between symptom severity and IQ (focus on visit 1 and children with ASD) and report the model, a plot of the model, a couple of lines describing the quality of the model and interpreting the results. P.S. Should you scale? P.P.S. Don't forget to motivate your priors. P.P.P.S. At least one plot for results and a plot for quality of each model (here and in the next questions) would be appreciated.
+
+
+
+1.1. Verbal IQ and ADOS
+```{r}
+Verbal <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + b*VerbalIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm(15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d )
+
+precis(Verbal)
+  
+
+
+```
+
+```{r}
+
+obs_pred_plot(d$ADOS,map_object = Verbal)
+```
+
+
+```{r}
+
+sampled_lines_plot(d$ADOS,d$VerbalIQ,Verbal, xlab = "Verbal IQ", ylab = "ADOS")
+```
+
+```{r}
+prior.df = data.frame(a_prior = rnorm(1e3,15,10), b_prior = rnorm(1e3,0,3),sigma_prior = rnorm(1e3,0,10))
+estimate.df = extract.samples(Verbal) 
+
+df = cbind(prior.df,estimate.df)
+
+df %>% 
+  gather(key,value, a_prior:sigma) %>% 
+  mutate(parameter = c(rep("a",10000),rep("b",10000), rep("sigma",10000),rep("a",10000),rep("b",10000), rep("sigma",10000))) %>% 
+  ggplot(aes(value, color = key))+
+  geom_density() +
+  facet_wrap(~parameter, scales = "free")+
+  labs(title = "posterior parameter distributions with priors, Verbal IQ", x = "parameter values", y ="density")
+  
+  
+```
+
+
+1.2. Non Verbal IQ and ADOS
+
+
+
+```{r}
+NonVerbal <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + b*NonVerbalIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(NonVerbal)
+
+```
+
+```{r}
+
+obs_pred_plot(observed_col = d$ADOS,map_object = NonVerbal)
+```
+
+
+```{r}
+
+sampled_lines_plot(d$ADOS,d$NonVerbalIQ,NonVerbal, xlab = "Non verbal IQ", ylab = "ADOS")
+```
+
+```{r}
+prior.df = data.frame(a_prior = rnorm(1e3,15,10), b_prior = rnorm(1e3,0,3),sigma_prior = rnorm(1e3,0,10))
+estimate.df = extract.samples(NonVerbal) 
+
+df = cbind(prior.df,estimate.df)
+
+df %>% 
+  gather(key,value, a_prior:sigma) %>% 
+  mutate(parameter = c(rep("a",10000),rep("b",10000), rep("sigma",10000),rep("a",10000),rep("b",10000), rep("sigma",10000))) %>% 
+  ggplot(aes(value, color = key))+
+  geom_density() +
+  facet_wrap(~parameter, scales = "free")+
+  labs(title = "posterior parameter distributions with priors, Non verbal IQ", x = "parameter values", y ="density")
+  
+  
+```
+
+
+
+
+1.3. Social IQ and ADOS
+```{r}
+Social <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + b*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d )
+precis(Social)
+
+
+```
+
+
+```{r}
+
+obs_pred_plot(d$ADOS,map_object = Social)
+```
+
+
+```{r}
+
+sampled_lines_plot(d$ADOS,d$SocialIQ,Social, xlab = "Social IQ", ylab = "ADOS")
+```
+
+
+```{r}
+
+prior.df = data.frame(a_prior = rnorm(1e3,15,10), b_prior = rnorm(1e3,0,3),sigma_prior = rnorm(1e3,0,10))
+estimate.df = extract.samples(Social) 
+
+df = cbind(prior.df,estimate.df)
+
+df %>% 
+  gather(key,value, a_prior:sigma) %>% 
+  mutate(parameter = c(rep("a",10000),rep("b",10000), rep("sigma",10000),rep("a",10000),rep("b",10000), rep("sigma",10000))) %>% 
+  ggplot(aes(value, color = key))+
+  geom_density() +
+  facet_wrap(~parameter, scales = "free")+
+  labs(title = "posterior parameter distributions with priors, Verbal IQ", x = "parameter values", y ="density")
+  
+  
+```
+
+
+
+2. Do the different aspects of IQ account for different portions of the variance in ADOS? 
+
+We scale to make the beta estiamte and expressions of correlation.
+```{r}
+
+
+d.scale = scale(d) %>% as.data.frame()
+d.scale
+```
+
+```{r}
+
+
+verbal_social <- map(
+  alist(
+    VerbalIQ ~ dnorm( mu , sigma ) ,
+    mu <- a + b*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(verbal_social)
+
+```
+
+```{r}
+sampled_lines_plot(outcome_col = d.scale$VerbalIQ, map_object =  verbal_social, predictor_col = d.scale$SocialIQ)
+
+```
+
+
+```{r}
+Nonverbal_social <- map(
+  alist(
+    NonVerbalIQ ~ dnorm( mu , sigma ) ,
+    mu <- a + b*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(Nonverbal_social)
+
+
+```
+
+```{r}
+sampled_lines_plot(outcome_col = d.scale$NonVerbalIQ, map_object =  Nonverbal_social, predictor_col = d.scale$SocialIQ)
+
+```
+
+
+```{r}
+Nonverbal_verbal <- map(
+  alist(
+    NonVerbalIQ ~ dnorm( mu , sigma ) ,
+    mu <- a + b*VerbalIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(Nonverbal_verbal)
+
+
+```
+
+```{r}
+sampled_lines_plot(outcome_col = d.scale$NonVerbalIQ, map_object =  Nonverbal_verbal, predictor_col = d.scale$VerbalIQ)
+
+
+
+```
+
+2.1. Does it make sense to have all IQ measures in the same model? First write a few lines answering the question and motivating your answer, including a discussion as to what happens when you put all of them in the same model. Then build a model following your answer. If your answer is "no", you are not free, you still have to answer: are there alternative ways of answering the question?
+
+
+```{r}
+
+```
+
+
+2.2. Build the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+full_mdl <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + b*NonVerbalIQ + c*VerbalIQ + d*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0, 3) ,
+    c ~ dnorm(0, 3) ,
+    d ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+two_mdl <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + b*NonVerbalIQ + d*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0, 3) ,
+    #c ~ dnorm(0, 3) ,
+    d ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+
+precis(full_mdl)
+```
+
+```{r}
+compare(two_mdl, full_mdl)
+```
+
+```{r}
+precis(two_mdl)
+```
+
+```{r}
+precis(full_mdl)
+```
+
+
+3. Let's now include also the TD children. Does it make sense to ask whether IQ and ADOS are related? Motivate your answer. In any case, if you wanted to build a model to answer that question, which model would you build? Run the model, assess its quality, write a few lines interpreting the results.
+
+```{r}
+da.scale = scale(da)
+
+da.scale = da.scale %>% 
+  as.data.frame %>% 
+  filter(complete.cases(da.scale))
+
+td_mdl_full <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + bn*NonVerbalIQ + bv*VerbalIQ + bs*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    bn ~ dnorm(0, 3) ,
+    bv ~ dnorm(0, 3) ,
+    bs ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=da.scale )
+
+td_two_mdl <- map(
+  alist(
+    ADOS ~ dnorm( mu , sigma ) ,
+    mu <- a + bn*NonVerbalIQ + bs*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    bn ~ dnorm(0, 3) ,
+    #c ~ dnorm(0, 3) ,
+    bs ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=da.scale )
+
+precis(td_mdl_full)
+precis(td_two_mdl)
+```
+
+
+```{r}
+plot(precis(td_mdl_full))
+```
+
+
+4. Let's discuss contents:
+4.1. You have three scores for IQ, do they show shared variance? Is that the same in TD and ASD? What does that tell us about IQ?
+4.2. You have explored the relation between IQ and ADOS. How do you explain that relation from a cognitive perspective? N.B. You can present alternative hypotheses.
+
+5. Bonus questions: Including measurement errors. 
+5.1. Let's assume that ADOS has a measurement error of 1. How would you model that in any of the previous models? 
+5.2. We know that IQ has an estimated measurement error of 2.12. How would you include that? 
+
+
+```{r}
+Nonverbal_verbal <- map(
+  alist(
+    VerbalIQ ~ dnorm( mu , sigma ) ,
+    mu <- a + b*NonVerbalIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(Nonverbal_verbal)
+
+resids = d.scale$VerbalIQ -  (coef(Nonverbal_verbal)["a"] + coef(Nonverbal_verbal)["b"]*d.scale$NonVerbalIQ)
+
+
+d.scale %>% 
+ggplot(aes(x = NonVerbalIQ,y = VerbalIQ))+
+  geom_point()+
+  geom_smooth(method = "lm")
+
+```
+```{r}
+d.scale %>% 
+ggplot(aes(x = NonVerbalIQ,y = resids))+
+  geom_point()+
+  geom_smooth(method = "lm")
+
+```
+
+
+```{r}
+d.scale$resids = resids
+
+resid_socia <- map(
+  alist(
+    resids ~ dnorm( mu , sigma ) ,
+    mu <- a + b*SocialIQ ,#ados as a linear function of VerbalIQ. 
+    a ~ dnorm( 15 , 10) ,
+    b ~ dnorm(0,3) ,
+    sigma ~ dunif(0 ,10)
+  ) ,
+  data=d.scale )
+
+precis(resid_socia)
+
+resids_2 = d.scale$resids -  (coef(resid_socia)["a"] + coef(resid_socia)["b"]*d.scale$SocialIQ)
+
+
+
+d.scale %>% 
+ggplot(aes(x = SocialIQ,y = resids))+
+  geom_point()+
+  geom_smooth(method = "lm")
+
+
+```
+
+
+
